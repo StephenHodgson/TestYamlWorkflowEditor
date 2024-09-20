@@ -21,10 +21,19 @@ var json = JsonSerializer.Serialize(yamlObject, new JsonSerializerOptions
     Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
 });
 Console.WriteLine(json);
+
 // modify the yamlObject workflow name property to TEST
-yamlObject["name"] = "TEST";
+if (yamlObject.ContainsKey("name"))
+{
+    yamlObject["name"] = "TEST";
+}
+else
+{
+    yamlObject.Add("name", "TEST");
+}
 
 // After modifying the yamlObject, serialize and write it back to the same input file
-ReadOnlyMemory<byte> modifiedYamlUtf8Bytes = YamlSerializer.Serialize(yamlObject);
+var yamlOptions = YamlSerializerOptions.Standard;
+ReadOnlyMemory<byte> modifiedYamlUtf8Bytes = YamlSerializer.Serialize(yamlObject, yamlOptions);
 await File.WriteAllBytesAsync(inputPath, modifiedYamlUtf8Bytes.ToArray());
 Console.WriteLine("YAML file modified successfully");
