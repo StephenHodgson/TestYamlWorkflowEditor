@@ -6,55 +6,54 @@ on:
   pull_request:
     branches:
       - '*'
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+    inputs:
+      clean:
+        description: 'Clean the project before building'
+        required: false
+        default: false
+        type: 'boolean'
 concurrency:
-  # Ensures that only one workflow runs at a time on each branch
   group: ${{ github.workflow }}-${{ github.ref }}
-  # only cancel the current run for open pull requests
   cancel-in-progress: ${{ ( github.event_name == 'pull_request' || github.event.action == 'synchronize' ) }}
 jobs:
   build:
     env:
-      UNITY_PROJECT_PATH: '' # set by the unity-setup action
+      UNITY_PROJECT_PATH: ''
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-13]
+        os: [buildalon-ubuntu, buildalon-windows, buildalon-macos]
         include:
-          - os: ubuntu-latest
+          - os: buildalon-ubuntu
             build-target: StandaloneLinux64
-          - os: windows-latest
+          - os: buildalon-windows
             build-target: StandaloneWindows64
-          - os: macos-13
+          - os: buildalon-macos
             build-target: StandaloneOSX
     steps:
       - uses: actions/checkout@v4
-
+        with:
+          clean: ${{ github.event.inputs.clean == 'true' }}
       - uses: buildalon/unity-setup@v1
         with:
           build-targets: ${{ matrix.build-target }}
-
       - uses: buildalon/activate-unity-license@v1
         with:
           license: 'Personal'
           username: ${{ secrets.UNITY_USERNAME }}
           password: ${{ secrets.UNITY_PASSWORD }}
-          # serial: ${{ secrets.UNITY_SERIAL }} # required for Professional license activations
-
       - uses: buildalon/unity-action@v1
         name: Project Validation
         with:
           log-name: 'project-validation'
           args: '-quit -batchmode -executeMethod Utilities.Editor.BuildPipeline.UnityPlayerBuildTools.ValidateProject'
-
       - uses: buildalon/unity-action@v1
         name: '${{ matrix.build-target }}-Build'
         with:
           log-name: '${{ matrix.build-target }}-Build'
           build-target: '${{ matrix.build-target }}'
           args: '-quit -batchmode -executeMethod Utilities.Editor.BuildPipeline.UnityPlayerBuildTools.StartCommandLineBuild'
-
       - uses: actions/upload-artifact@v4
         id: upload-artifact
         name: 'Upload ${{ matrix.build-target }} Artifacts'
@@ -69,7 +68,6 @@ jobs:
             !${{ env.UNITY_PROJECT_PATH || github.workspace }}/Library/**/*
             !/**/*_BackUpThisFolder_ButDontShipItWithYourGame/**
             !/**/*_BurstDebugInformation_DoNotShip/**
-
       - name: Clean Artifacts
         if: always()
         shell: pwsh
