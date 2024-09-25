@@ -1,3 +1,4 @@
+# A generalized Unity build workflow that can be used with any Unity project.
 name: Unity Build
 on:
   push:
@@ -6,6 +7,7 @@ on:
   pull_request:
     branches:
       - '*'
+  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
     inputs:
       clean:
@@ -14,12 +16,14 @@ on:
         default: false
         type: 'boolean'
 concurrency:
+  # Ensures that only one workflow runs at a time on each branch
   group: ${{ github.workflow }}-${{ github.ref }}
+  # Cancels in progress runs for open pull requests
   cancel-in-progress: ${{ ( github.event_name == 'pull_request' || github.event.action == 'synchronize' ) }}
 jobs:
   build:
     env:
-      UNITY_PROJECT_PATH: ''
+      UNITY_PROJECT_PATH: '' # set by the unity-setup action
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -43,6 +47,8 @@ jobs:
           license: 'Personal'
           username: ${{ secrets.UNITY_USERNAME }}
           password: ${{ secrets.UNITY_PASSWORD }}
+          # required for Professional license activations
+          # serial: ${{ secrets.UNITY_SERIAL }}
       - uses: buildalon/unity-action@v1
         name: Project Validation
         with:

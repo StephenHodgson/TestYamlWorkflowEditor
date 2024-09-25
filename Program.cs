@@ -1,7 +1,4 @@
-﻿// Overview: This console app is designed to read a GitHub Actions Workflow YAML file
-// and edit the file depending on the user's inputs.
-
-Console.WriteLine("Enter the path to the YAML file:");
+﻿Console.WriteLine("Enter the path to the YAML file:");
 var inputPath = Console.ReadLine();
 
 // check that path is valid and file exists
@@ -10,30 +7,62 @@ if (!File.Exists(inputPath))
     Console.WriteLine("File does not exist");
     return;
 }
-// open the file and read the contents as utf8 bytes
-var yamlUtf8Bytes = await File.ReadAllBytesAsync(inputPath);
-var yamlObject = YamlSerializer.Deserialize<dynamic>(yamlUtf8Bytes);
+
+// open the file and read the contents as a string
+var yamlContent = await File.ReadAllTextAsync(inputPath);
+using var stringReader = new StringReader(yamlContent);
+var yamlStream = new YamlStream();
+
+try
+{
+    yamlStream.Load(stringReader);
+}
+finally
+{
+    stringReader.Close();
+}
+
+var yamlDocument = yamlStream.Documents[0];
+var rootNode = (YamlMappingNode)yamlDocument.RootNode;
+var yamlObject = rootNode.Children;
 Console.WriteLine("YAML file loaded successfully");
 
-var json = JsonSerializer.Serialize(yamlObject, new JsonSerializerOptions
-{
-    WriteIndented = true,
-    Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-});
-Console.WriteLine(json);
-
-// modify the yamlObject workflow name property to TEST
+// modify the yamlDocument to set the workflow name property to TEST
+// check if "name" exists then change the value to TEST
 if (yamlObject.ContainsKey("name"))
 {
-    yamlObject["name"] = "TEST";
+    yamlObject["name"] = new YamlScalarNode("TEST");
 }
 else
 {
-    yamlObject.Add("name", "TEST");
+    var node = new YamlScalarNode("TEST")
+    {
+        Style = ScalarStyle.SingleQuoted
+    };
+    yamlObject.Add("name", node);
 }
 
+// insert a new Scalar Node named "new" and set its value to "Test Value 2"
+var newNode = new YamlScalarNode("Test Value 2")
+{
+    Style = ScalarStyle.SingleQuoted
+};
+yamlObject.Add("test-node", newNode);
+
 // After modifying the yamlObject, serialize and write it back to the same input file
-var yamlOptions = YamlSerializerOptions.Standard;
-ReadOnlyMemory<byte> modifiedYamlUtf8Bytes = YamlSerializer.Serialize(yamlObject, yamlOptions);
-await File.WriteAllBytesAsync(inputPath, modifiedYamlUtf8Bytes.ToArray());
-Console.WriteLine("YAML file modified successfully");
+var serializer = new SerializerBuilder()
+    .WithIndentedSequences()
+    .Build();
+await using var output = new StringWriter();
+
+try
+{
+    serializer.Serialize(output, rootNode);
+    var modifiedYamlContent = output.ToString();
+    await File.WriteAllTextAsync(inputPath, modifiedYamlContent);
+    Console.WriteLine("YAML file modified successfully");
+}
+finally
+{
+    output.Close();
+}
